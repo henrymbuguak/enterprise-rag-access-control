@@ -1,0 +1,23 @@
+[
+  {
+    "name": "get_active_contracts",
+    "description": "Active supplier contracts, optionally for one supplier",
+    "params": {"supplier": "supplier name, or null for all suppliers"},
+    "sql": "SELECT contract_id, supplier, status, start_date, end_date FROM contracts WHERE status = 'active' AND (%(supplier)s::text IS NULL OR supplier ILIKE '%%' || %(supplier)s || '%%') ORDER BY contract_id LIMIT 200",
+    "auth_mode": "user"
+  },
+  {
+    "name": "get_maintenance_schedule",
+    "description": "The maintenance schedule for one asset",
+    "params": {"asset_id": "asset identifier such as ENG-4573"},
+    "sql": "SELECT asset_id, name, site, maintenance_schedule FROM assets WHERE asset_id = %(asset_id)s",
+    "auth_mode": "user"
+  },
+  {
+    "name": "get_procurement_spend",
+    "description": "Procurement spend by category for one quarter",
+    "params": {"quarter": "quarter in the form 2026-Q3"},
+    "sql": "SELECT quarter, category, amount_eur FROM procurement_spend WHERE quarter = %(quarter)s ORDER BY amount_eur DESC",
+    "auth_mode": "user"
+  }
+]
