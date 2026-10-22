@@ -1,0 +1,25 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+ENV/
+env/
+build/
+dist/
+*.egg-info/
+
+# === VS Code ===
+.vscode/
+
+# === Environment & Secrets ===
+.env
+
+# === Custom Evaluation Files ===
+eval/report.json
+eval/judge_sample.csv
+
+# === macOS ===
+.DS_Store

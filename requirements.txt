@@ -1,0 +1,15 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic-settings==2.6.1
+psycopg[binary]==3.2.3
+opensearch-py==2.8.0
+minio==7.2.12
+sentence-transformers==3.3.1
+confluent-kafka==2.6.1
+httpx==0.28.0
+PyJWT==2.10.1
+cachetools==5.5.0
+prometheus-client==0.21.1
+pypdf==5.1.0
+python-docx==1.1.2
+pytest==8.3.4

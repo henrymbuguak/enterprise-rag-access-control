@@ -1,0 +1,179 @@
+name: brimmora
+
+# Shared settings for the three services built from ./Dockerfile
+x-app: &app
+  build: .
+  env_file: .env
+  volumes:
+    - ./app:/srv/app
+    - ./seed:/srv/seed
+    - ./eval:/srv/eval
+    - ./tests:/srv/tests
+    - hf:/models
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  depends_on:
+    postgres: { condition: service_healthy }
+    opensearch: { condition: service_healthy }
+    minio-init: { condition: service_completed_successfully }
+
+services:
+  # ---------- core infrastructure (always on) ----------
+  postgres:
+    image: postgres:16.4
+    environment:
+      POSTGRES_USER: brimmora
+      POSTGRES_PASSWORD: brimmora
+      POSTGRES_DB: brimmora
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./seed/sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brimmora -d brimmora"]
+      interval: 5s
+      retries: 30
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.10
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+    ports: ["19092:19092"]
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true'"]
+      interval: 5s
+      retries: 30
+
+  redpanda-init:
+    image: redpandadata/redpanda:v24.2.10
+    depends_on:
+      redpanda: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["rpk topic create minio-events minio-events-dlq -X brokers=redpanda:9092 || true"]
+
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      # Bucket notifications go to Redpanda: our stand-in for SharePoint change notifications
+      MINIO_NOTIFY_KAFKA_ENABLE_PRIMARY: "on"
+      MINIO_NOTIFY_KAFKA_BROKERS_PRIMARY: redpanda:9092
+      MINIO_NOTIFY_KAFKA_TOPIC_PRIMARY: minio-events
+      MINIO_NOTIFY_KAFKA_QUEUE_DIR_PRIMARY: /data/.notify-queue
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [minio:/data]
+    depends_on:
+      redpanda-init: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 30
+
+  minio-init:
+    image: minio/mc:RELEASE.2024-11-17T19-35-25Z
+    env_file: .env
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        mc alias set local http://minio:9000 "$$MINIO_ACCESS_KEY" "$$MINIO_SECRET_KEY" &&
+        mc mb --ignore-existing "local/$$BUCKET" &&
+        (mc event add "local/$$BUCKET" arn:minio:sqs::PRIMARY:kafka --event put,delete || true) &&
+        mc event ls "local/$$BUCKET"
+
+  opensearch:
+    image: opensearchproject/opensearch:2.18.0
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"        # local development only
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms1g -Xmx1g"
+    ulimits:
+      nofile: { soft: 65536, hard: 65536 }
+    ports: ["9200:9200"]
+    volumes: [osdata:/usr/share/opensearch/data]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s'"]
+      interval: 10s
+      retries: 30
+
+  # ---------- switched on by COMPOSE_PROFILES ----------
+  ollama:
+    image: ollama/ollama:0.4.7
+    profiles: [ollama]
+    ports: ["11434:11434"]
+    volumes: [ollama:/root/.ollama]
+
+  runner:
+    <<: *app
+    profiles: [tools]
+    command: ["python", "-c", "print('runner ready')"]
+
+  api:
+    <<: *app
+    profiles: [api]
+    command: ["uvicorn", "brimmora.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports: ["8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 10s
+      start_period: 180s
+      retries: 30
+
+  consumer:
+    <<: *app
+    profiles: [events]
+    command: ["python", "-m", "brimmora.consumer"]
+    ports: ["8001:8001"]
+
+  airflow:
+    build: { context: ., dockerfile: Dockerfile.airflow }
+    profiles: [airflow]
+    command: standalone
+    env_file: .env
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      PYTHONPATH: /opt/brimmora/app
+      HF_HOME: /opt/airflow/models
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./app:/opt/brimmora/app
+      - airflow-models:/opt/airflow/models
+    ports: ["8080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      opensearch: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: [monitoring]
+    volumes: ["./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    profiles: [monitoring]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"      # local development only
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+
+volumes:
+  pgdata: {}
+  minio: {}
+  osdata: {}
+  ollama: {}
+  hf: {}
+  airflow-models: {}
