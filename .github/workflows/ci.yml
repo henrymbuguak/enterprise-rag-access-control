@@ -1,0 +1,88 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  unit-and-security-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.4
+        env: { POSTGRES_USER: brimmora, POSTGRES_PASSWORD: brimmora, POSTGRES_DB: brimmora }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U brimmora" --health-interval 5s --health-retries 20
+    env:
+      PG_ADMIN_DSN: postgresql://brimmora:brimmora@localhost:5432/brimmora
+      PG_APP_DSN: postgresql://app_user:app_user@localhost:5432/brimmora
+      PYTHONPATH: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: |
+          pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+      - name: Load schema and seed data
+        run: |
+          for f in seed/sql/*.sql; do
+            PGPASSWORD=brimmora psql -h localhost -U brimmora -d brimmora -v ON_ERROR_STOP=1 -f "$f"
+          done
+      - run: pytest -q tests
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Secret scan (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: SBOM (Syft)
+        uses: anchore/sbom-action@v0
+        with: { path: ., format: spdx-json, artifact-name: sbom.spdx.json }
+      - name: Vulnerability scan (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with: { scan-type: fs, scan-ref: ., severity: "HIGH,CRITICAL", ignore-unfixed: true, exit-code: "1" }
+      - name: Policy checks (OPA via conftest)
+        run: >
+          docker run --rm -v "$PWD":/project -w /project openpolicyagent/conftest:v0.56.0
+          test docker-compose.yml app/brimmora/tools.json -p policy
+
+  rag-evaluation:
+    needs: [unit-and-security-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure the stack for CI
+        run: |
+          cp .env.example .env
+          sed -i 's|^COMPOSE_PROFILES=.*|COMPOSE_PROFILES=ollama,api|' .env
+          sed -i 's|^OLLAMA_URL=.*|OLLAMA_URL=http://ollama:11434|' .env
+      - run: make up
+      - run: make seed index-init sync
+      - run: make pull-model
+      - run: make wait-api
+      - run: make eval
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: eval-report, path: eval/report.json }
+
+  publish-image:
+    if: github.ref == 'refs/heads/main'
+    needs: [unit-and-security-tests, supply-chain, rag-evaluation]
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: Lowercase image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}/brimmora-api" >> "$GITHUB_ENV"
+      - uses: docker/build-push-action@v6
+        with: { context: ., push: true, tags: "${{ env.IMAGE }}:${{ github.sha }}" }
