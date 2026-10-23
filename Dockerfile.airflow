@@ -1,7 +1,7 @@
 FROM apache/airflow:2.10.3-python3.11
 # Created as the airflow user so the model-cache volume is writable
 RUN mkdir -p /opt/airflow/models
-RUN pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
 COPY requirements-pipeline.txt /tmp/requirements-pipeline.txt
 # Pinning apache-airflow stops pip from upgrading Airflow's own dependencies
 RUN pip install --no-cache-dir "apache-airflow==2.10.3" -r /tmp/requirements-pipeline.txt

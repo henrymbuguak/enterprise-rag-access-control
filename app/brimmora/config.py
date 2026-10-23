@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     region: str = "eu-west"
     tenant_id: str = "manufacturing"
     group_cache_ttl_seconds: int = 600
-    jwt_secret: str = "dev-only-change-me"
+    jwt_secret: str = "dev-only-jwt-secret-change-me-in-production"
     dev_mode: bool = False
     prompt_version: str = "answer-v1"
     api_url: str = "http://localhost:8000"
