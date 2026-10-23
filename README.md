@@ -10,7 +10,7 @@ A working, open-source implementation of a permission-aware enterprise AI assist
 
 The project implements the **Brimmora** reference architecture, a case study of a fictional manufacturer, on your laptop with Docker. Brimmora, its users, and its documents are illustrative.
 
-📖 Case study: [Building Brimmora's enterprise AI platform](https://hlab.tech/posts/enterprise-ai-platform-reference-architecture/)
+📖 Case study: [Building an enterprise AI platform: permission-aware RAG that holds up in production](https://hlab.tech/posts/enterprise-ai-platform-reference-architecture/)
 
 ## What it demonstrates
 
