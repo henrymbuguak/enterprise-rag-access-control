@@ -4,19 +4,23 @@ export
 DC  := docker compose
 RUN := $(DC) run --rm runner
 
-.PHONY: setup build infra up down reset seed index-init sync reconcile explain pull-model wait-api \
+.PHONY: setup docker-ok build infra up down reset seed index-init sync reconcile explain pull-model wait-api \
         ask trace set-acl eval agreement test policy logs upgrade-build upgrade-swap check-00 check-09 check-15
 
 setup:        ## first run only: create .env from the template
-	@test -f .env || cp .env.example .env; echo ".env ready"
+	@if [ -f .env ]; then echo ".env already exists, left unchanged"; else cp .env.example .env && echo "created .env from .env.example"; fi
+	@grep -q '^MINIO_ACCESS_KEY=' .env || echo "WARNING: .env is missing settings. Run: cp .env.example .env"
 
-build:        ## build the shared Python image
+docker-ok:    ## fail fast when Docker is not running
+	@docker info >/dev/null 2>&1 || { echo "Docker is not running. Start Docker Desktop, wait for it to finish starting, then retry."; exit 1; }
+
+build: docker-ok  ## build the shared Python image
 	$(DC) build runner
 
-infra:        ## Postgres, Redpanda, MinIO, OpenSearch
+infra: docker-ok  ## Postgres, Redpanda, MinIO, OpenSearch
 	$(DC) up -d postgres redpanda redpanda-init minio minio-init opensearch
 
-up:           ## everything enabled in COMPOSE_PROFILES
+up: docker-ok     ## everything enabled in COMPOSE_PROFILES
 	$(DC) up -d --build
 
 down:
