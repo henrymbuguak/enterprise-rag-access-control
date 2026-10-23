@@ -120,7 +120,7 @@ make trace ID=<request_id>
 make check-16
 ```
 
-This runs 10 end-to-end tests: event-driven freshness, ACL change, and delete; unauthorized access; structured routing; hybrid retrieval; no evidence; monitoring; ACL drift; reconciliation; prompt injection; and audit trace. Expect `ALL PASSED (15/15)` in a few minutes.
+This runs 10 end-to-end scenarios with 15 checks: event-driven freshness, ACL change, and delete; unauthorized access; structured routing; hybrid retrieval; no evidence; monitoring; ACL drift; reconciliation; prompt injection; and audit trace. Expect `ALL PASSED (15/15)` in a few minutes.
 
 ## Services
 
