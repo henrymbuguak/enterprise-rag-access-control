@@ -1,0 +1,6 @@
+{
+  "route_accuracy": 0.85,
+  "retrieval_hit_rate": 0.8,
+  "grounded_rate": 0.75,
+  "refusal_accuracy": 1.0
+}

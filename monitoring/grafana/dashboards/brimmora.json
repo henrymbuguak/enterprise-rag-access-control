@@ -1,0 +1,16 @@
+{
+  "uid": "brimmora", "title": "Brimmora AI Platform", "schemaVersion": 39, "refresh": "10s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {"id": 1, "type": "timeseries", "title": "Requests by route and outcome (per s)", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}, "targets": [{"expr": "sum by (route, outcome) (rate(brimmora_requests_total[5m]))", "refId": "A"}]},
+    {"id": 2, "type": "timeseries", "title": "p95 request latency (s)", "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}, "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(brimmora_request_seconds_bucket[5m])))", "refId": "A"}]},
+    {"id": 3, "type": "timeseries", "title": "Delete propagation p99 (s), target < 300", "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}, "targets": [{"expr": "histogram_quantile(0.99, sum by (le) (rate(brimmora_delete_propagation_seconds_bucket[1h])))", "refId": "A"}]},
+    {"id": 4, "type": "timeseries", "title": "Index freshness p95 (s), target < 900", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}, "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(brimmora_index_freshness_seconds_bucket[1h])))", "refId": "A"}]},
+    {"id": 5, "type": "timeseries", "title": "Quality gate failures by gate (1h)", "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8}, "targets": [{"expr": "sum by (gate) (increase(brimmora_quality_gate_failures_total[1h]))", "refId": "A"}]},
+    {"id": 6, "type": "timeseries", "title": "Empty context by group (1h)", "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8}, "targets": [{"expr": "sum by (group) (increase(brimmora_empty_context_total[1h]))", "refId": "A"}]},
+    {"id": 7, "type": "stat", "title": "Documents in quarantine", "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8}, "targets": [{"expr": "brimmora_quarantined_documents", "refId": "A"}]},
+    {"id": 8, "type": "stat", "title": "Output check blocks (1h)", "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8}, "targets": [{"expr": "increase(brimmora_output_check_failures_total[1h])", "refId": "A"}]},
+    {"id": 9, "type": "timeseries", "title": "LLM tokens by purpose (per s)", "gridPos": {"x": 0, "y": 32, "w": 12, "h": 8}, "targets": [{"expr": "sum by (purpose) (rate(brimmora_llm_tokens_total[5m]))", "refId": "A"}]},
+    {"id": 10, "type": "timeseries", "title": "Answer cache hit rate", "gridPos": {"x": 12, "y": 32, "w": 12, "h": 8}, "targets": [{"expr": "sum(rate(brimmora_answer_cache_total{result=\"hit\"}[5m])) / sum(rate(brimmora_answer_cache_total[5m]))", "refId": "A"}]}
+  ]
+}
