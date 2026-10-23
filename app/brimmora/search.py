@@ -68,7 +68,7 @@ def create_index(version):
     name = f"{settings.index_alias}-{version}"
     client = os_client()
     if not client.indices.exists(index=name):
-        client.indices.create(index=name, body=mapping(embedder().get_sentence_embedding_dimension()))
+        client.indices.create(index=name, body=mapping(embedder().get_embedding_dimension()))
     return name
 
 

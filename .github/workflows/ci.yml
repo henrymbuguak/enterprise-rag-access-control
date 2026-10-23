@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
       - run: |
-          pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
       - name: Load schema and seed data
         run: |
@@ -46,7 +46,7 @@ jobs:
         uses: anchore/sbom-action@v0
         with: { path: ., format: spdx-json, artifact-name: sbom.spdx.json }
       - name: Vulnerability scan (Trivy)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0, safe per GHSA-69fq-xp46-6x23
         with: { scan-type: fs, scan-ref: ., severity: "HIGH,CRITICAL", ignore-unfixed: true, exit-code: "1" }
       - name: Policy checks (OPA via conftest)
         run: >
