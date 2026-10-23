@@ -34,36 +34,9 @@ Each control in the case study runs here and is proven by an automated check.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  subgraph Sources["Sources of truth"]
-    PG[(PostgreSQL<br/>contracts, assets, identities)]
-    S3[(MinIO<br/>documents + ACL metadata)]
-  end
-  subgraph Ingest["Ingestion paths"]
-    AF[Airflow<br/>scheduled sync + reconciliation]
-    RP[[Redpanda<br/>change events]] --> CO[Consumer<br/>deletes and ACL sync]
-    AD{Admit rule<br/>fails closed}
-    Q[(Quarantine)]
-  end
-  OS[(OpenSearch<br/>BM25 + vectors)]
-  subgraph Serve["Request time"]
-    API[FastAPI<br/>auth + group cache] --> RT{Intent router}
-    RT -->|documents| RAG[Hybrid RAG<br/>pre-filter, rerank]
-    RT -->|records| TL[User-scoped SQL tools]
-    RAG --> G[Quality gates]
-    TL --> G
-    G --> LLM[Ollama LLM] --> ANS[Cited answer + audit log]
-  end
-  S3 -- bucket events --> RP
-  S3 --> AF
-  AF --> AD
-  CO --> AD
-  AD -->|admit| OS
-  AD -->|missing ACL or injection| Q
-  RAG <--> OS
-  TL -- row-level security --> PG
-```
+![Brimmora enterprise AI platform: sources of truth feed scheduled and event-driven ingestion through a fail-closed admit rule into a per-region OpenSearch index; at request time an intent router sends questions to hybrid RAG or user-scoped structured tools, through quality gates to a regional model, with audit, monitoring, eval-gated CI/CD, and ownership across every layer](docs/architecture.png)
+
+The diagram shows the production design from the case study. This repository runs the same flow locally: MinIO stands in for SharePoint and object storage, PostgreSQL for the ERP and the identity provider, Redpanda for the change-event queue, and Ollama for the model endpoint.
 
 ## Quick start
 
