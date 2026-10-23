@@ -88,7 +88,7 @@ services:
         MC=$$(command -v mc || command -v mcli) &&
         $$MC alias set local http://minio:9000 "$$MINIO_ACCESS_KEY" "$$MINIO_SECRET_KEY" &&
         $$MC mb --ignore-existing "local/$$BUCKET" &&
-        ($$MC event add "local/$$BUCKET" arn:minio:sqs::PRIMARY:kafka --event put,delete || true) &&
+        $$MC event add --ignore-existing "local/$$BUCKET" arn:minio:sqs::PRIMARY:kafka --event put,delete &&
         $$MC event ls "local/$$BUCKET"
 
   opensearch:

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brimmora Assistant</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 16px; color: #1d2433; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0; }
+  select, input, button { font: inherit; padding: 8px 10px; border: 1px solid #c9ced8; border-radius: 6px; }
+  form { display: flex; gap: 8px; }
+  input { flex: 1; min-width: 0; }
+  button { background: #1d4ed8; color: #fff; border: 0; cursor: pointer; }
+  .answer { margin-top: 20px; padding: 16px; border: 1px solid #e3e6ec; border-radius: 8px; white-space: pre-wrap; }
+  .meta { color: #5b6475; font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Brimmora Assistant</h1>
+  <label>Signed in as
+    <select id="user">
+      <option>alice</option><option selected>bob</option><option>carol</option><option>dave</option>
+    </select>
+  </label>
+</header>
+<form id="ask">
+  <input id="q" placeholder="Ask about procedures, incidents, contracts..." required minlength="3">
+  <button>Ask</button>
+</form>
+<div id="out"></div>
+<script>
+const out = document.getElementById("out");
+function box(cls, text) { const d = document.createElement("div"); d.className = cls; d.textContent = text; return d; }
+document.getElementById("ask").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const user = document.getElementById("user").value;
+  const question = document.getElementById("q").value;
+  out.replaceChildren(box("answer", "Thinking..."));
+  try {
+    const { token } = await (await fetch(`/dev/token?user=${encodeURIComponent(user)}`)).json();
+    const res = await fetch("/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ question }),
+    });
+    const r = await res.json();
+    const sources = r.citations.map(c => `[${c.n}] ${c.source}`).join(", ") || "none";
+    out.replaceChildren(box("answer", r.answer),
+                        box("meta", `route: ${r.route} · sources: ${sources} · request: ${r.request_id}`));
+  } catch (err) {
+    out.replaceChildren(box("answer", `Request failed: ${err}`));
+  }
+});
+</script>
+</body>
+</html>
